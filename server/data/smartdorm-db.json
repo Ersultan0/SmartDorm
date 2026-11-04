@@ -1,0 +1,50 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "role": "student",
+      "fullName": "Аппасхожа Ерсұлтан",
+      "email": "appashozaersultan@gmail.com",
+      "phone": "+7 789 456 12 31",
+      "passwordHash": "$2b$12$gbIRXJ9Gjrahv1JVgyA6AeJUIYaSnbdHegD0A1Eu95neihnlI5eMG",
+      "city": "Almaty",
+      "createdAt": "2026-11-04T07:41:16.845Z"
+    }
+  ],
+  "studentProfiles": [
+    {
+      "id": 1,
+      "userId": 1,
+      "university": "International University of Information Technologies (IITU)",
+      "faculty": "Information Technologies",
+      "course": 4
+    }
+  ],
+  "adminProfiles": [],
+  "chatMessages": [
+    {
+      "id": 1,
+      "userId": 1,
+      "message": "Hello",
+      "reply": "Мен SmartDorm демо-көмекшісімін. Бос орын, өтініш, құжаттар немесе техникалық мәселе туралы сұрап көріңіз.",
+      "language": "kk",
+      "createdAt": "2026-11-04T07:41:47.977Z"
+    },
+    {
+      "id": 2,
+      "userId": 1,
+      "message": "бос орын барма",
+      "reply": "Бос орындар «Жатақханалар» бөлімінде көрсетіледі. Қазіргі нұсқадағы сандар демо деректер; кейін олар нақты базаға байланысады.",
+      "language": "kk",
+      "createdAt": "2026-11-04T07:42:20.280Z"
+    },
+    {
+      "id": 3,
+      "userId": 1,
+      "message": "оны қалай қараймын",
+      "reply": "Мен SmartDorm демо-көмекшісімін. Бос орын, өтініш, құжаттар немесе техникалық мәселе туралы сұрап көріңіз.",
+      "language": "kk",
+      "createdAt": "2026-11-04T07:42:41.001Z"
+    }
+  ]
+}
