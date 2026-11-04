@@ -1,13 +1,27 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState
+} from "react";
 
 const AuthContext = createContext(null);
 
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  "https://smartdorm-backend-trzy.onrender.com";
+
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => localStorage.getItem("smartdorm_token"));
+  const [token, setToken] = useState(() =>
+    localStorage.getItem("smartdorm_token")
+  );
+
   const [user, setUser] = useState(() => {
     const raw = localStorage.getItem("smartdorm_user");
     return raw ? JSON.parse(raw) : null;
   });
+
   const [loading, setLoading] = useState(Boolean(token));
 
   useEffect(() => {
@@ -15,29 +29,50 @@ export function AuthProvider({ children }) {
       setLoading(false);
       return;
     }
-    fetch("/api/me", {
-      headers: { Authorization: `Bearer ${token}` }
+
+    fetch(`${API_URL}/api/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
     })
       .then(async (res) => {
-        if (!res.ok) throw new Error("Unauthorized");
+        if (!res.ok) {
+          throw new Error("Unauthorized");
+        }
+
         return res.json();
       })
       .then((data) => {
         setUser(data.user);
-        localStorage.setItem("smartdorm_user", JSON.stringify(data.user));
+
+        localStorage.setItem(
+          "smartdorm_user",
+          JSON.stringify(data.user)
+        );
       })
       .catch(() => {
         localStorage.removeItem("smartdorm_token");
         localStorage.removeItem("smartdorm_user");
+
         setToken(null);
         setUser(null);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+      });
   }, [token]);
 
   const login = (newToken, newUser) => {
-    localStorage.setItem("smartdorm_token", newToken);
-    localStorage.setItem("smartdorm_user", JSON.stringify(newUser));
+    localStorage.setItem(
+      "smartdorm_token",
+      newToken
+    );
+
+    localStorage.setItem(
+      "smartdorm_user",
+      JSON.stringify(newUser)
+    );
+
     setToken(newToken);
     setUser(newUser);
   };
@@ -45,12 +80,27 @@ export function AuthProvider({ children }) {
   const logout = () => {
     localStorage.removeItem("smartdorm_token");
     localStorage.removeItem("smartdorm_user");
+
     setToken(null);
     setUser(null);
   };
 
-  const value = useMemo(() => ({ token, user, loading, login, logout }), [token, user, loading]);
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  const value = useMemo(
+    () => ({
+      token,
+      user,
+      loading,
+      login,
+      logout
+    }),
+    [token, user, loading]
+  );
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

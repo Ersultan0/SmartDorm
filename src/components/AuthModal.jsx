@@ -4,6 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { ALMATY_UNIVERSITIES } from "../data/universities.js";
 import { useLanguage } from "../context/LanguageContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  "https://smartdorm-backend-trzy.onrender.com";
 
 const initialStudent = {
   fullName: "", email: "", phone: "", university: "", faculty: "", course: "",
@@ -126,7 +129,7 @@ export default function AuthModal({ mode, onClose, onSwitch }) {
             })
       };
 
-      const res = await fetch("/api/auth/register", {
+      const res = await fetch(`${API_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Accept-Language": lang },
         body: JSON.stringify(payload)
@@ -159,7 +162,7 @@ export default function AuthModal({ mode, onClose, onSwitch }) {
     setBusy(true);
     setServerError("");
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Accept-Language": lang },
         body: JSON.stringify({
@@ -176,7 +179,7 @@ export default function AuthModal({ mode, onClose, onSwitch }) {
       onClose();
       navigate("/portal");
     } catch {
-      setServerError("Server is not available. Make sure npm run dev is running.");
+      setServerError("SmartDorm server is temporarily unavailable.");
     } finally {
       setBusy(false);
     }
