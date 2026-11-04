@@ -17,11 +17,12 @@
     "cors": "latest",
     "express": "latest",
     "jsonwebtoken": "latest",
+    "lowdb": "latest",
     "lucide-react": "latest",
+    "pg": "^8.23.1",
     "react": "latest",
     "react-dom": "latest",
     "react-router-dom": "latest",
-    "vite": "latest",
-    "lowdb": "latest"
+    "vite": "latest"
   }
 }
