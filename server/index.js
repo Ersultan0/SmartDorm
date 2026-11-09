@@ -41,6 +41,10 @@ async function loadUser(id) {
       email,
       phone,
       city,
+      is_blocked,
+      block_reason,
+      blocked_at,
+      last_login_at,
       created_at
     FROM users
     WHERE id = $1
@@ -61,13 +65,22 @@ async function loadUser(id) {
     email: row.email,
     phone: row.phone,
     city: row.city,
+
+    isBlocked: row.is_blocked,
+    blockReason: row.block_reason,
+    blockedAt: row.blocked_at,
+    lastLoginAt: row.last_login_at,
+
     createdAt: row.created_at,
   };
 
   if (row.role === "student") {
     const profileResult = await pool.query(
       `
-      SELECT university, faculty, course
+      SELECT
+        university,
+        faculty,
+        course
       FROM student_profiles
       WHERE user_id = $1
       `,
@@ -84,30 +97,34 @@ async function loadUser(id) {
     };
   }
 
-  const profileResult = await pool.query(
-    `
-    SELECT
-      position,
-      organization_type,
-      university,
-      dormitory_name,
-      dormitory_address
-    FROM admin_profiles
-    WHERE user_id = $1
-    `,
-    [id]
-  );
+  if (row.role === "admin" || row.role === "staff") {
+    const profileResult = await pool.query(
+      `
+      SELECT
+        position,
+        organization_type,
+        university,
+        dormitory_name,
+        dormitory_address
+      FROM admin_profiles
+      WHERE user_id = $1
+      `,
+      [id]
+    );
 
-  const profile = profileResult.rows[0] || {};
+    const profile = profileResult.rows[0] || {};
 
-  return {
-    ...safeUser,
-    position: profile.position,
-    organizationType: profile.organization_type,
-    university: profile.university,
-    dormitoryName: profile.dormitory_name,
-    dormitoryAddress: profile.dormitory_address,
-  };
+    return {
+      ...safeUser,
+      position: profile.position,
+      organizationType: profile.organization_type,
+      university: profile.university,
+      dormitoryName: profile.dormitory_name,
+      dormitoryAddress: profile.dormitory_address,
+    };
+  }
+
+  return safeUser;
 }
 
 app.get("/", (req, res) => {

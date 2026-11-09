@@ -177,7 +177,12 @@ export default function AuthModal({ mode, onClose, onSwitch }) {
       }
       login(result.token, result.user);
       onClose();
-      navigate("/portal");
+
+    if (result.user.role === "admin" || result.user.role === "staff") {
+    navigate("/staff");
+    } else {
+    navigate("/portal");
+    }
     } catch {
       setServerError("SmartDorm server is temporarily unavailable.");
     } finally {
