@@ -1716,17 +1716,24 @@ export default function AuthModal({
               )}
 
               <button
+                type={emailVerified ? "submit" : "button"}
                 className="submit-button"
-                disabled={
-                  busy ||
-                  !emailVerified
+                disabled={busy || codeBusy}
+                onClick={
+                  emailVerified
+                    ? undefined
+                    : sendVerificationCode
                 }
               >
                 {busy
-                  ? "..."
-                  : emailVerified
-                    ? t.create
-                    : "Verify email first"}
+                  ? "Creating account..."
+                  : codeBusy
+                    ? "Sending code..."
+                    : emailVerified
+                      ? t.create
+                      : codeSent
+                        ? "Resend verification code"
+                        : "Send verification code"}
               </button>
             </form>
 
