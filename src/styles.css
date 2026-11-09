@@ -755,3 +755,26 @@ select.field-control { appearance: auto; }
     grid-template-columns: 1fr;
   }
 }
+.staff-create-form {
+  max-width: 600px;
+  display: grid;
+  gap: 12px;
+  background: white;
+  padding: 20px;
+  border-radius: 15px;
+}
+
+.staff-create-form input {
+  padding: 12px;
+  border: 1px solid #dce5e0;
+  border-radius: 9px;
+}
+
+.staff-create-form button {
+  padding: 12px;
+  border: 0;
+  border-radius: 9px;
+  background: #16734e;
+  color: white;
+  cursor: pointer;
+}

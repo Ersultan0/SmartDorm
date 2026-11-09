@@ -628,5 +628,137 @@ router.get(
     }
   }
 );
+router.post("/create", staffAuth, async (req, res) => {
+  try {
+    // Тек admin жаңа staff жасай алады
+    if (req.userRole !== "admin") {
+      return res.status(403).json({
+        message: "Only admin can create staff accounts"
+      });
+    }
 
+    const {
+      fullName,
+      email,
+      phone,
+      password,
+      position,
+      dormitoryName,
+      dormitoryAddress
+    } = req.body || {};
+
+    // Міндетті өрістерді тексереміз
+    if (!fullName || !email || !phone || !password) {
+      return res.status(400).json({
+        message: "Required fields are missing"
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Осы email бұрын тіркелген бе?
+    const existing = await pool.query(
+      `
+      SELECT id
+      FROM users
+      WHERE LOWER(email) = $1
+      `,
+      [normalizedEmail]
+    );
+
+    if (existing.rows.length) {
+      return res.status(409).json({
+        message: "This email is already registered"
+      });
+    }
+
+    // Парольді шифрлау үшін bcrypt керек
+    const bcrypt = await import("bcryptjs");
+
+    const passwordHash =
+      await bcrypt.default.hash(password, 12);
+
+    // users кестесіне staff қосамыз
+    const userResult = await pool.query(
+      `
+      INSERT INTO users
+      (
+        role,
+        full_name,
+        email,
+        phone,
+        password_hash,
+        city
+      )
+      VALUES
+      ('staff', $1, $2, $3, $4, 'Almaty')
+      RETURNING id
+      `,
+      [
+        fullName.trim(),
+        normalizedEmail,
+        phone,
+        passwordHash
+      ]
+    );
+
+    const userId = userResult.rows[0].id;
+
+    // staff туралы қосымша мәлімет
+    await pool.query(
+      `
+      INSERT INTO admin_profiles
+      (
+        user_id,
+        position,
+        organization_type,
+        university,
+        dormitory_name,
+        dormitory_address
+      )
+      VALUES
+      ($1, $2, 'private', NULL, $3, $4)
+      `,
+      [
+        userId,
+        position || "Dormitory Staff",
+        dormitoryName || "SmartDorm",
+        dormitoryAddress || "Almaty"
+      ]
+    );
+
+    // Кім staff құрғанын журналға жазамыз
+    await pool.query(
+      `
+      INSERT INTO activity_logs
+      (
+        actor_id,
+        action,
+        target_user_id,
+        details
+      )
+      VALUES
+      ($1, 'CREATE_STAFF', $2, $3)
+      `,
+      [
+        req.userId,
+        userId,
+        `Created staff account: ${fullName}`
+      ]
+    );
+
+    return res.status(201).json({
+      ok: true,
+      userId,
+      message: "Staff account created"
+    });
+
+  } catch (err) {
+    console.error(err);
+
+    return res.status(500).json({
+      message: "Failed to create staff"
+    });
+  }
+});
 export default router;
