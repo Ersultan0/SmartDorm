@@ -13,7 +13,7 @@ import {
     Activity,
     X,
 } from "lucide-react";
-
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const API_URL =
@@ -21,8 +21,8 @@ const API_URL =
     "https://smartdorm-backend-trzy.onrender.com";
 
 export default function StaffDashboard() {
-    const { token, user } = useAuth();
-
+    const { token, user, logout } = useAuth();
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState("dashboard");
 
     const [stats, setStats] = useState(null);
@@ -184,6 +184,10 @@ export default function StaffDashboard() {
             alert(err.message);
         }
     }
+    function handleLogout() {
+        logout();
+        navigate("/");
+    }
     async function blockStudent() {
         if (!selectedStudent) return;
 
@@ -339,6 +343,13 @@ export default function StaffDashboard() {
                 <div className="staff-account">
                     <strong>{user?.fullName}</strong>
                     <span>{user?.role}</span>
+
+                    <button
+                        className="staff-logout"
+                        onClick={handleLogout}
+                    >
+                        Logout
+                    </button>
                 </div>
             </aside>
 

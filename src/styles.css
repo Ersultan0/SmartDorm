@@ -830,3 +830,17 @@ select.field-control { appearance: auto; }
   color: #16734e;
   font-weight: 600;
 }
+
+.staff-logout {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: transparent;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.staff-logout:hover {
+  background: rgba(255,255,255,0.1);
+}
