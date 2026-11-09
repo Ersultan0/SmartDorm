@@ -3,7 +3,7 @@ import cors from "cors";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import pool, { initDatabase } from "./db.js";
-
+import staffRouter from "./staff.js";
 const app = express();
 
 const PORT = process.env.PORT || 4000;
@@ -13,6 +13,7 @@ const JWT_SECRET =
 
 app.use(cors());
 app.use(express.json());
+app.use("/api/staff", staffRouter);
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const phoneRe = /^\+7 7\d{2} \d{3} \d{2} \d{2}$/;
@@ -348,9 +349,14 @@ app.post("/api/auth/login", async (req, res) => {
 
   const result = await pool.query(
     `
-    SELECT id, role, password_hash
-    FROM users
-    WHERE LOWER(email) = $1
+    SELECT
+  id,
+  role,
+  password_hash,
+  is_blocked,
+  block_reason
+FROM users
+WHERE LOWER(email) = $1
     `,
     [email.trim().toLowerCase()]
   );
@@ -360,6 +366,13 @@ app.post("/api/auth/login", async (req, res) => {
   }
 
   const row = result.rows[0];
+  if (row.is_blocked) {
+  return res.status(403).json({
+    message: "Your SmartDorm account has been blocked.",
+    blocked: true,
+    reason: row.block_reason,
+  });
+}
 
   const ok = await bcrypt.compare(
     password,
