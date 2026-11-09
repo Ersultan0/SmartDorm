@@ -360,18 +360,11 @@ export default function AuthModal({
   // =========================
 
   async function verifyEmailCode() {
-    const email =
-      current.email
-        .trim()
-        .toLowerCase();
+    const email = current.email.trim().toLowerCase();
+    const code = verificationCode.trim();
 
-    if (
-      verificationCode.length !== 6
-    ) {
-      setServerError(
-        "Enter the 6-digit verification code."
-      );
-
+    if (!/^\d{6}$/.test(code)) {
+      setServerError("Enter the correct 6-digit code.");
       return;
     }
 
@@ -383,26 +376,21 @@ export default function AuthModal({
         `${API_URL}/api/auth/verify-code`,
         {
           method: "POST",
-
           headers: {
-            "Content-Type":
-              "application/json",
+            "Content-Type": "application/json",
           },
-
           body: JSON.stringify({
             email,
-            code: verificationCode,
+            code,
           }),
         }
       );
 
-      const data =
-        await res.json();
+      const data = await res.json();
 
       if (!res.ok) {
         throw new Error(
-          data.message ||
-          "Verification failed"
+          data.message || "Verification failed"
         );
       }
 
@@ -411,10 +399,7 @@ export default function AuthModal({
 
     } catch (err) {
       setEmailVerified(false);
-
-      setServerError(
-        err.message
-      );
+      setServerError(err.message);
     } finally {
       setCodeBusy(false);
     }
@@ -1718,21 +1703,25 @@ export default function AuthModal({
               <button
                 type={emailVerified ? "submit" : "button"}
                 className="submit-button"
-                disabled={busy || codeBusy}
+                disabled={
+                  busy ||
+                  codeBusy ||
+                  (codeSent && !emailVerified)
+                }
                 onClick={
-                  emailVerified
-                    ? undefined
-                    : sendVerificationCode
+                  !codeSent && !emailVerified
+                    ? sendVerificationCode
+                    : undefined
                 }
               >
                 {busy
                   ? "Creating account..."
                   : codeBusy
-                    ? "Sending code..."
+                    ? "Please wait..."
                     : emailVerified
                       ? t.create
                       : codeSent
-                        ? "Resend verification code"
+                        ? "Enter code and click Verify above"
                         : "Send verification code"}
               </button>
             </form>
