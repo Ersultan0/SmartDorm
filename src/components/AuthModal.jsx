@@ -51,6 +51,10 @@ export default function AuthModal({ mode, onClose, onSwitch }) {
   const [success, setSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [codeBusy, setCodeBusy] = useState(false);
 
   const current = role === "student" ? student : admin;
 
@@ -100,7 +104,95 @@ export default function AuthModal({ mode, onClose, onSwitch }) {
     setAdmin((prev) => ({ ...prev, [key]: value }));
     setErrors((prev) => ({ ...prev, [key]: undefined }));
   };
+  async function sendVerificationCode() {
+    const email = current.email.trim().toLowerCase();
 
+    if (!email) {
+      setErrors((prev) => ({
+        ...prev,
+        email: "Email is required"
+      }));
+      return;
+    }
+
+    try {
+      setCodeBusy(true);
+      setServerError("");
+
+      const res = await fetch(
+        `${API_URL}/api/auth/send-code`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ email })
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          data.message || "Code could not be sent"
+        );
+      }
+
+      setCodeSent(true);
+      setEmailVerified(false);
+      setVerificationCode("");
+
+      alert("Verification code sent to your email.");
+    } catch (err) {
+      setServerError(err.message);
+    } finally {
+      setCodeBusy(false);
+    }
+  }
+
+  async function verifyEmailCode() {
+    const email = current.email.trim().toLowerCase();
+
+    if (verificationCode.length !== 6) {
+      setServerError("Enter the 6-digit verification code.");
+      return;
+    }
+
+    try {
+      setCodeBusy(true);
+      setServerError("");
+
+      const res = await fetch(
+        `${API_URL}/api/auth/verify-code`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            email,
+            code: verificationCode
+          })
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          data.message || "Verification failed"
+        );
+      }
+
+      setEmailVerified(true);
+
+      alert("Email verified successfully.");
+    } catch (err) {
+      setServerError(err.message);
+    } finally {
+      setCodeBusy(false);
+    }
+  }
   const submitRegistration = async (event) => {
     event.preventDefault();
     setServerError("");
@@ -116,17 +208,17 @@ export default function AuthModal({ mode, onClose, onSwitch }) {
         password: data.password,
         ...(role === "student"
           ? {
-              university: data.university,
-              faculty: data.faculty.trim(),
-              course: data.course
-            }
+            university: data.university,
+            faculty: data.faculty.trim(),
+            course: data.course
+          }
           : {
-              position: data.position.trim(),
-              organizationType: data.organizationType,
-              university: data.organizationType === "university" ? data.university : null,
-              dormitoryName: data.dormitoryName.trim(),
-              dormitoryAddress: data.dormitoryAddress.trim()
-            })
+            position: data.position.trim(),
+            organizationType: data.organizationType,
+            university: data.organizationType === "university" ? data.university : null,
+            dormitoryName: data.dormitoryName.trim(),
+            dormitoryAddress: data.dormitoryAddress.trim()
+          })
       };
 
       const res = await fetch(`${API_URL}/api/auth/register`, {
@@ -178,11 +270,11 @@ export default function AuthModal({ mode, onClose, onSwitch }) {
       login(result.token, result.user);
       onClose();
 
-    if (result.user.role === "admin" || result.user.role === "staff") {
-    navigate("/staff");
-    } else {
-    navigate("/portal");
-    }
+      if (result.user.role === "admin" || result.user.role === "staff") {
+        navigate("/staff");
+      } else {
+        navigate("/portal");
+      }
     } catch {
       setServerError("SmartDorm server is temporarily unavailable.");
     } finally {
@@ -218,15 +310,75 @@ export default function AuthModal({ mode, onClose, onSwitch }) {
           <p className="modal-intro">{t.loginText}</p>
 
           <form onSubmit={submitLogin} noValidate>
-            <Field label={t.email} error={errors.loginEmail}>
+            <Field label={t.email} error={errors.email}>
               <input
-                className={fieldClass("loginEmail")}
+                className={fieldClass("email")}
                 type="email"
-                value={loginData.email}
-                onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                placeholder="student@example.kz"
+                value={current.email}
+                onChange={(e) => {
+                  const value = e.target.value;
+
+                  if (role === "student") {
+                    updateStudent("email", value);
+                  } else {
+                    updateAdmin("email", value);
+                  }
+
+                  setEmailVerified(false);
+                  setCodeSent(false);
+                  setVerificationCode("");
+                }}
+                placeholder="name@example.kz"
               />
             </Field>
+            <div className="verification-box">
+              <button
+                type="button"
+                className="verification-send-button"
+                onClick={sendVerificationCode}
+                disabled={codeBusy || emailVerified}
+              >
+                {emailVerified
+                  ? "Email verified"
+                  : codeBusy
+                    ? "Sending..."
+                    : "Send verification code"}
+              </button>
+
+              {codeSent && !emailVerified && (
+                <div className="verification-code-row">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="6-digit code"
+                    value={verificationCode}
+                    onChange={(e) =>
+                      setVerificationCode(
+                        e.target.value.replace(/\D/g, "")
+                      )
+                    }
+                  />
+
+                  <button
+                    type="button"
+                    onClick={verifyEmailCode}
+                    disabled={
+                      codeBusy ||
+                      verificationCode.length !== 6
+                    }
+                  >
+                    {codeBusy ? "..." : "Verify"}
+                  </button>
+                </div>
+              )}
+
+              {emailVerified && (
+                <div className="email-verified-text">
+                  ✓ Email verified
+                </div>
+              )}
+            </div>
             <Field label={t.password} error={errors.loginPassword}>
               <div className="password-wrap">
                 <input
@@ -339,7 +491,7 @@ export default function AuthModal({ mode, onClose, onSwitch }) {
                     <Field label={t.course} error={errors.course}>
                       <select className={fieldClass("course")} value={student.course} onChange={(e) => updateStudent("course", e.target.value)}>
                         <option value="">{t.selectCourse}</option>
-                        {[1,2,3,4,5,6].map((n) => <option key={n} value={String(n)}>{n}</option>)}
+                        {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={String(n)}>{n}</option>)}
                       </select>
                     </Field>
                   </>
@@ -383,7 +535,16 @@ export default function AuthModal({ mode, onClose, onSwitch }) {
               {errors.agree && <small className="error-text block">{errors.agree}</small>}
               {serverError && <div className="form-alert error">{serverError}</div>}
 
-              <button className="submit-button" disabled={busy}>{busy ? "..." : t.create}</button>
+              <button
+                className="submit-button"
+                disabled={busy || !emailVerified}
+              >
+                {busy
+                  ? "..."
+                  : emailVerified
+                    ? t.create
+                    : "Verify email first"}
+              </button>
             </form>
             <p className="switch-auth">{t.hasAccount} <button onClick={() => onSwitch("login")}>{t.login}</button></p>
           </>

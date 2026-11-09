@@ -1,7 +1,11 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import nodemailer from "nodemailer";
+import { randomInt } from "crypto";
+
 import pool, { initDatabase } from "./db.js";
 import staffRouter from "./staff.js";
 const app = express();
@@ -11,6 +15,13 @@ const JWT_SECRET =
   process.env.JWT_SECRET ||
   "smartdorm-local-development-secret-change-later";
 
+const mailTransporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.MAIL_USER,
+    pass: process.env.MAIL_APP_PASSWORD,
+  },
+});
 app.use(cors());
 app.use(express.json());
 app.use("/api/staff", staffRouter);
@@ -134,6 +145,223 @@ app.get("/", (req, res) => {
     message: "SmartDorm backend is running",
   });
 });
+  app.post("/api/auth/send-code", async (req, res) => {
+  try {
+    const email = String(req.body?.email || "")
+      .trim()
+      .toLowerCase();
+
+    if (!email || !emailRe.test(email)) {
+      return error(
+        res,
+        400,
+        "Invalid email format",
+        "email"
+      );
+    }
+
+    // Бұл email бұрын тіркелген бе?
+    const existingUser = await pool.query(
+      `
+      SELECT id
+      FROM users
+      WHERE LOWER(email) = $1
+      `,
+      [email]
+    );
+
+    if (existingUser.rows.length) {
+      return error(
+        res,
+        409,
+        "This email is already registered",
+        "email"
+      );
+    }
+
+    // 100000 - 999999 аралығындағы 6 таңбалы код
+    const code = String(
+      randomInt(100000, 1000000)
+    );
+
+    // Кодты ашық түрде базаға сақтамаймыз
+    const codeHash = await bcrypt.hash(code, 10);
+
+    // Код 10 минут жұмыс істейді
+    const expiresAt =
+      new Date(Date.now() + 10 * 60 * 1000);
+
+    await pool.query(
+      `
+      INSERT INTO email_verifications
+      (
+        email,
+        code_hash,
+        expires_at,
+        verified
+      )
+      VALUES ($1, $2, $3, FALSE)
+
+      ON CONFLICT (email)
+
+      DO UPDATE SET
+        code_hash = EXCLUDED.code_hash,
+        expires_at = EXCLUDED.expires_at,
+        verified = FALSE,
+        created_at = CURRENT_TIMESTAMP
+      `,
+      [
+        email,
+        codeHash,
+        expiresAt
+      ]
+    );
+
+    await mailTransporter.sendMail({
+      from: `"SmartDorm" <${process.env.MAIL_USER}>`,
+      to: email,
+      subject: "SmartDorm verification code",
+
+      text: `
+Your SmartDorm verification code is: ${code}
+
+This code expires in 10 minutes.
+
+Do not share this code with anyone.
+      `,
+
+      html: `
+        <div style="
+          font-family:Arial,sans-serif;
+          max-width:500px;
+          margin:auto;
+          padding:30px;
+        ">
+          <h2 style="color:#16734e;">
+            SmartDorm
+          </h2>
+
+          <p>
+            Your verification code:
+          </p>
+
+          <div style="
+            font-size:32px;
+            font-weight:bold;
+            letter-spacing:8px;
+            padding:18px;
+            background:#f2f7f4;
+            border-radius:10px;
+            text-align:center;
+          ">
+            ${code}
+          </div>
+
+          <p>
+            This code expires in 10 minutes.
+          </p>
+
+          <small>
+            Do not share this code with anyone.
+          </small>
+        </div>
+      `,
+    });
+
+    return res.json({
+      ok: true,
+      message: "Verification code sent"
+    });
+
+  } catch (err) {
+    console.error("SEND CODE ERROR:", err);
+
+    return res.status(500).json({
+      message: "Verification code could not be sent"
+    });
+  }
+});
+app.post("/api/auth/verify-code", async (req, res) => {
+  try {
+    const email = String(req.body?.email || "")
+      .trim()
+      .toLowerCase();
+
+    const code = String(req.body?.code || "")
+      .trim();
+
+    if (!email || !code) {
+      return res.status(400).json({
+        message: "Email and code are required"
+      });
+    }
+
+    if (!/^\d{6}$/.test(code)) {
+      return res.status(400).json({
+        message: "Code must contain 6 digits"
+      });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT *
+      FROM email_verifications
+      WHERE email = $1
+      `,
+      [email]
+    );
+
+    if (!result.rows.length) {
+      return res.status(400).json({
+        message: "Verification code not found"
+      });
+    }
+
+    const verification = result.rows[0];
+
+    if (
+      new Date(verification.expires_at) <
+      new Date()
+    ) {
+      return res.status(400).json({
+        message: "Verification code has expired"
+      });
+    }
+
+    const correct = await bcrypt.compare(
+      code,
+      verification.code_hash
+    );
+
+    if (!correct) {
+      return res.status(400).json({
+        message: "Incorrect verification code"
+      });
+    }
+
+    await pool.query(
+      `
+      UPDATE email_verifications
+      SET verified = TRUE
+      WHERE email = $1
+      `,
+      [email]
+    );
+
+    return res.json({
+      ok: true,
+      verified: true,
+      message: "Email verified"
+    });
+
+  } catch (err) {
+    console.error("VERIFY CODE ERROR:", err);
+
+    return res.status(500).json({
+      message: "Verification failed"
+    });
+  }
+});
 
 app.post("/api/auth/register", async (req, res) => {
   const body = req.body || {};
@@ -250,6 +478,47 @@ app.post("/api/auth/register", async (req, res) => {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
+  const verificationResult = await pool.query(
+  `
+  SELECT verified, expires_at
+  FROM email_verifications
+  WHERE email = $1
+  `,
+  [normalizedEmail]
+);
+
+if (!verificationResult.rows.length) {
+  return error(
+    res,
+    403,
+    "Please verify your email first",
+    "email"
+  );
+}
+
+const verification =
+  verificationResult.rows[0];
+
+if (!verification.verified) {
+  return error(
+    res,
+    403,
+    "Email is not verified",
+    "email"
+  );
+}
+
+if (
+  new Date(verification.expires_at) <
+  new Date()
+) {
+  return error(
+    res,
+    403,
+    "Email verification has expired",
+    "email"
+  );
+}
 
   const existing = await pool.query(
     "SELECT id FROM users WHERE LOWER(email) = $1",
@@ -333,6 +602,14 @@ app.post("/api/auth/register", async (req, res) => {
     }
 
     await client.query("COMMIT");
+
+    await pool.query(
+  `
+  DELETE FROM email_verifications
+  WHERE email = $1
+  `,
+  [normalizedEmail]
+);
 
     return res.status(201).json({
       ok: true,

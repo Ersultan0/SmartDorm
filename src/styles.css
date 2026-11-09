@@ -778,3 +778,55 @@ select.field-control { appearance: auto; }
   color: white;
   cursor: pointer;
 }
+
+.verification-box {
+  grid-column: 1 / -1;
+  margin-top: -4px;
+  margin-bottom: 6px;
+}
+
+.verification-send-button {
+  border: 0;
+  background: #e7f3ed;
+  color: #16734e;
+  padding: 10px 14px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.verification-send-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.verification-code-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.verification-code-row input {
+  flex: 1;
+  padding: 11px 12px;
+  border: 1px solid #dce5e0;
+  border-radius: 9px;
+  letter-spacing: 4px;
+  text-align: center;
+  font-size: 17px;
+}
+
+.verification-code-row button {
+  border: 0;
+  background: #16734e;
+  color: white;
+  padding: 0 16px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.email-verified-text {
+  margin-top: 10px;
+  color: #16734e;
+  font-weight: 600;
+}
