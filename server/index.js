@@ -3,7 +3,6 @@ import express from "express";
 import cors from "cors";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import nodemailer from "nodemailer";
 import { randomInt } from "crypto";
 
 import pool, { initDatabase } from "./db.js";
@@ -15,13 +14,6 @@ const JWT_SECRET =
   process.env.JWT_SECRET ||
   "smartdorm-local-development-secret-change-later";
 
-const mailTransporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_APP_PASSWORD,
-  },
-});
 app.use(cors());
 app.use(express.json());
 app.use("/api/staff", staffRouter);
@@ -145,7 +137,7 @@ app.get("/", (req, res) => {
     message: "SmartDorm backend is running",
   });
 });
-  app.post("/api/auth/send-code", async (req, res) => {
+app.post("/api/auth/send-code", async (req, res) => {
   try {
     const email = String(req.body?.email || "")
       .trim()
@@ -217,56 +209,60 @@ app.get("/", (req, res) => {
       ]
     );
 
-    await mailTransporter.sendMail({
-      from: `"SmartDorm" <${process.env.MAIL_USER}>`,
-      to: email,
-      subject: "SmartDorm verification code",
+    // Send verification email through Brevo HTTPS API
+    const mailResponse = await fetch(
+      "https://api.brevo.com/v3/smtp/email",
+      {
+        method: "POST",
 
-      text: `
-Your SmartDorm verification code is: ${code}
+        headers: {
+          "Content-Type": "application/json",
+          accept: "application/json",
+          "api-key": process.env.BREVO_API_KEY,
+        },
+
+        body: JSON.stringify({
+          sender: {
+            name: "SmartDorm",
+            email: process.env.MAIL_USER,
+          },
+
+          to: [
+            {
+              email: email,
+            },
+          ],
+
+          subject: "SmartDorm verification code",
+
+          textContent: `
+Welcome to SmartDorm!
+
+Your verification code is:
+
+${code}
 
 This code expires in 10 minutes.
 
 Do not share this code with anyone.
       `,
+        }),
 
-      html: `
-        <div style="
-          font-family:Arial,sans-serif;
-          max-width:500px;
-          margin:auto;
-          padding:30px;
-        ">
-          <h2 style="color:#16734e;">
-            SmartDorm
-          </h2>
+        signal: AbortSignal.timeout(15000),
+      }
+    );
 
-          <p>
-            Your verification code:
-          </p>
+    // Check whether Brevo accepted the email
+    if (!mailResponse.ok) {
+      console.error(
+        "Brevo email error:",
+        mailResponse.status
+      );
 
-          <div style="
-            font-size:32px;
-            font-weight:bold;
-            letter-spacing:8px;
-            padding:18px;
-            background:#f2f7f4;
-            border-radius:10px;
-            text-align:center;
-          ">
-            ${code}
-          </div>
+      throw new Error("Failed to send verification email");
+    }
 
-          <p>
-            This code expires in 10 minutes.
-          </p>
-
-          <small>
-            Do not share this code with anyone.
-          </small>
-        </div>
-      `,
-    });
+    console.log("Verification email accepted by Brevo");
 
     return res.json({
       ok: true,
@@ -479,46 +475,46 @@ app.post("/api/auth/register", async (req, res) => {
 
   const normalizedEmail = email.trim().toLowerCase();
   const verificationResult = await pool.query(
-  `
+    `
   SELECT verified, expires_at
   FROM email_verifications
   WHERE email = $1
   `,
-  [normalizedEmail]
-);
-
-if (!verificationResult.rows.length) {
-  return error(
-    res,
-    403,
-    "Please verify your email first",
-    "email"
+    [normalizedEmail]
   );
-}
 
-const verification =
-  verificationResult.rows[0];
+  if (!verificationResult.rows.length) {
+    return error(
+      res,
+      403,
+      "Please verify your email first",
+      "email"
+    );
+  }
 
-if (!verification.verified) {
-  return error(
-    res,
-    403,
-    "Email is not verified",
-    "email"
-  );
-}
+  const verification =
+    verificationResult.rows[0];
 
-if (
-  new Date(verification.expires_at) <
-  new Date()
-) {
-  return error(
-    res,
-    403,
-    "Email verification has expired",
-    "email"
-  );
-}
+  if (!verification.verified) {
+    return error(
+      res,
+      403,
+      "Email is not verified",
+      "email"
+    );
+  }
+
+  if (
+    new Date(verification.expires_at) <
+    new Date()
+  ) {
+    return error(
+      res,
+      403,
+      "Email verification has expired",
+      "email"
+    );
+  }
 
   const existing = await pool.query(
     "SELECT id FROM users WHERE LOWER(email) = $1",
@@ -604,12 +600,12 @@ if (
     await client.query("COMMIT");
 
     await pool.query(
-  `
+      `
   DELETE FROM email_verifications
   WHERE email = $1
   `,
-  [normalizedEmail]
-);
+      [normalizedEmail]
+    );
 
     return res.status(201).json({
       ok: true,
@@ -661,12 +657,12 @@ WHERE LOWER(email) = $1
 
   const row = result.rows[0];
   if (row.is_blocked) {
-  return res.status(403).json({
-    message: "Your SmartDorm account has been blocked.",
-    blocked: true,
-    reason: row.block_reason,
-  });
-}
+    return res.status(403).json({
+      message: "Your SmartDorm account has been blocked.",
+      blocked: true,
+      reason: row.block_reason,
+    });
+  }
 
   const ok = await bcrypt.compare(
     password,
